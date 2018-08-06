@@ -39,24 +39,54 @@ class ListViewAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     override fun getItemCount(): Int = mItems.size
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-        (holder as? CategoryItemViewHolder)?.setText(mItems[position])
-                ?: (holder as? ChildItemViewHolder)?.setText(mItems[position])
+        (holder as? CategoryItemViewHolder)?.setupItem(mItems[position])
+                ?: (holder as? ChildItemViewHolder)?.setupItem(mItems[position])
+    }
+
+    override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
+        super.onViewRecycled(holder)
+        (holder as? CategoryItemViewHolder)?.stopCallbacks()
+                ?: (holder as? ChildItemViewHolder)?.stopCallbacks()
     }
 
     internal class CategoryItemViewHolder(val view: View) : RecyclerView.ViewHolder(view) {
+
+        var viewHolderSwipeHelper: ViewHolderSwipeHelper? = null
         val viewForeground = view.viewForegroundCategory
-        fun setText(listItem: ListItem) {
+        fun setupItem(listItem: ListItem) {
             view.category_text.text = listItem.getText()
             view.category_text_background.text = listItem.getBackText()
+
+            if (listItem.getStateHalfSwiped()) {
+                viewForeground.translationX = -viewForeground.width * 0.5f
+            } else {
+                viewForeground.translationX = 0f
+            }
+
+            viewHolderSwipeHelper = ViewHolderSwipeHelper(listItem, this, viewForeground)
+
         }
+
+        fun stopCallbacks() {}
     }
 
     internal class ChildItemViewHolder(val view: View) : RecyclerView.ViewHolder(view) {
+        var viewHolderSwipeHelper: ViewHolderSwipeHelper? = null
         val viewForeground = view.viewForeground
-        fun setText(listItem: ListItem) {
+        fun setupItem(listItem: ListItem) {
             view.child_text.text = listItem.getText()
             view.child_text_background.text = listItem.getBackText()
+
+            viewHolderSwipeHelper = ViewHolderSwipeHelper(listItem, this, viewForeground)
+
+            if (listItem.getStateHalfSwiped()) {
+                viewForeground.translationX = -viewForeground.width * 0.5f
+            } else {
+                viewForeground.translationX = 0f
+            }
         }
+
+        fun stopCallbacks() {}
     }
 
     enum class ViewTypes {

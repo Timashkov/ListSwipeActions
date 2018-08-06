@@ -18,4 +18,6 @@ class ChildListItem(index: Int, val mParent: Int) : ListItem {
     override fun setStateHalfSwiped(isSwiped: Boolean) {
         mHalfSwiped = isSwiped
     }
+
+    override fun getStateHalfSwiped(): Boolean = mHalfSwiped
 }

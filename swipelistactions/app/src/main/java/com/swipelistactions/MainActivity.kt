@@ -20,8 +20,6 @@ class MainActivity : AppCompatActivity(), RecyclerItemTouchHelper.RecyclerItemTo
         listView.layoutManager = LinearLayoutManager(this)
         listView.adapter = adapter
 
-        ItemTouchHelper(RecyclerItemTouchHelper(0, ItemTouchHelper.LEFT, this)).attachToRecyclerView(listView)
-
         adapter.setData(prepareDataSet())
     }
 

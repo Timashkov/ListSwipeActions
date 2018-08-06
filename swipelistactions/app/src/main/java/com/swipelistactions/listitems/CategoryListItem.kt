@@ -20,4 +20,6 @@ class CategoryListItem(private val mId: Int) : ListItem {
     override fun setStateHalfSwiped(isSwiped: Boolean) {
         mHalfSwiped = isSwiped
     }
+
+    override fun getStateHalfSwiped(): Boolean = mHalfSwiped
 }

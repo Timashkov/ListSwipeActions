@@ -8,4 +8,5 @@ interface ListItem {
     fun getStateCollapsed(): Boolean
 
     fun setStateHalfSwiped(isSwiped: Boolean)
+    fun getStateHalfSwiped(): Boolean
 }

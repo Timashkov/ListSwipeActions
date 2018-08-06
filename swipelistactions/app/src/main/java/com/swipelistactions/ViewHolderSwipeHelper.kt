@@ -4,11 +4,13 @@ import android.animation.Animator
 import android.animation.ValueAnimator
 import android.graphics.Canvas
 import android.support.v4.view.ViewCompat
+import android.support.v7.recyclerview.R
 import android.support.v7.widget.RecyclerView
 import android.view.*
 import com.swipelistactions.ItemTouchHelper.*
 import com.swipelistactions.listitems.ListItem
 import java.util.ArrayList
+import kotlin.math.absoluteValue
 
 /**
  * Created by Aleksei Timashkov on 06.08.18.
@@ -115,6 +117,7 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
     private var mRecoverAnimations: MutableList<RecoverAnimation> = ArrayList()
     private var mSelected = false
 
+
     private val mOnItemTouchListener = View.OnTouchListener { v, event ->
         event?.let {
             val action = event.actionMasked
@@ -124,13 +127,11 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
                 MotionEvent.ACTION_DOWN -> {
                     mActivePointerId = event.getPointerId(0)
                     mInitialTouchX = event.x + mMovementView.translationX
-                    mInitialTouchY = event.y
                     obtainVelocityTracker()
                     if (!mSelected) {
-                        val animation = findAnimation(event)
+                        val animation = findAnimation()
                         if (animation != null) {
                             mInitialTouchX -= animation.mX
-                            mInitialTouchY -= animation.mY
                             endRecoverAnimation(true)
                             if (mPendingCleanup.remove(animation.mViewHolder.itemView)) {
 //                                    mCallback.clearView(mRecyclerView, animation.mViewHolder)
@@ -196,9 +197,14 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
         mViewHolder.itemView.setOnTouchListener(mOnItemTouchListener)
         val vc = ViewConfiguration.get(mViewHolder.itemView.context)
         mSlop = vc.scaledTouchSlop
+        mSwipeEscapeVelocity = mMovementView.context.resources
+                .getDimension(R.dimen.item_touch_helper_swipe_escape_velocity)
+        mMaxSwipeVelocity = mMovementView.context.resources
+                .getDimension(R.dimen.item_touch_helper_swipe_escape_max_velocity)
+
     }
 
-    internal fun obtainVelocityTracker() {
+    private fun obtainVelocityTracker() {
         mVelocityTracker?.recycle()
         mVelocityTracker = VelocityTracker.obtain()
     }
@@ -209,12 +215,12 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
 
     }
 
-    private fun findAnimation(event: MotionEvent): RecoverAnimation? {
+    private fun findAnimation(): RecoverAnimation? {
         if (mRecoverAnimations.isEmpty()) {
             return null
         }
         for (i in mRecoverAnimations.indices.reversed()) {
-            val anim = mRecoverAnimations.get(i)
+            val anim = mRecoverAnimations[i]
             if (anim.mViewHolder.itemView === mViewHolder.itemView) {
                 return anim
             }
@@ -256,7 +262,7 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
         return true
     }
 
-    internal fun select(actionState: Int) {
+    private fun select(actionState: Int) {
         if (actionState == mActionState) {
             return
         }
@@ -266,76 +272,59 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
         endRecoverAnimation(true)
         mActionState = actionState
 
-        val actionStateMask = (1 shl DIRECTION_FLAG_COUNT + DIRECTION_FLAG_COUNT * actionState) - 1
-        var preventLayout = false
-
         if (mSelected) {
 
             if (mViewHolder.itemView.parent != null) {
-                val swipeDir = checkHorizontalSwipe(LEFT)
-                releaseVelocityTracker()
-                // find where we should animate to
-                val targetTranslateX: Float
-                val targetTranslateY: Float
-                val animationType: Int
-                when (swipeDir) {
-                    LEFT, RIGHT, START, END -> {
-                        targetTranslateY = 0f
-                        targetTranslateX = Math.signum(mDx) * mViewHolder.itemView.width
-                    }
-                    else -> {
-                        targetTranslateX = 0f
-                        targetTranslateY = 0f
-                    }
-                }
-                if (swipeDir > 0) {
-                    animationType = ANIMATION_TYPE_SWIPE_SUCCESS
-                } else {
-                    animationType = ANIMATION_TYPE_SWIPE_CANCEL
-                }
+
+
+                val targetTranslateX = calculateTargetTranslateX()
+
+
                 val tmpPosition = FloatArray(2)
                 getSelectedDxDy(tmpPosition)
                 val currentTranslateX = tmpPosition[0]
-                val currentTranslateY = tmpPosition[1]
 
-
-                val rv = object : RecoverAnimation(mViewHolder, mMovementView, animationType,
-                        prevActionState, currentTranslateX, currentTranslateY,
-                        targetTranslateX, targetTranslateY) {
+                val rv = object :RecoverAnimation(mViewHolder, mMovementView,
+                        prevActionState, currentTranslateX, targetTranslateX)
+                {
                     override fun onAnimationEnd(animation: Animator) {
                         super.onAnimationEnd(animation)
                         if (this.mOverridden) {
                             return
                         }
-                        if (swipeDir <= 0) {
-                            // this is a drag or failed swipe. recover immediately
-//                            mCallback.clearView(mRecyclerView, prevSelected)
-                            mMovementView.translationX = 0f
-                            mMovementView.translationY = 0f
-                            // full cleanup will happen on onDrawOver
+                        val thresholdToHalf = mMovementView.width.toFloat() * 0.2f
+                        val thresholdToFull = mMovementView.width.toFloat() * 0.7f
+                        if (targetTranslateX.absoluteValue >= thresholdToFull ){
+                            //TODO: cleanup
+                        } else if(targetTranslateX.absoluteValue >= thresholdToHalf) {
+                            mItem.setStateHalfSwiped(true)
                         } else {
-                            // wait until remove animation is complete.
-                            mPendingCleanup.add(mViewHolder.itemView)
-                            mIsPendingCleanup = true
-                            if (swipeDir > 0) {
-                                // Animation might be ended by other animators during a layout.
-                                // We defer callback to avoid editing adapter during a layout.
-//                                postDispatchSwipe(this, swipeDir)
-                            }
+                            mItem.setStateHalfSwiped(false)
                         }
-                        // removed from the list after it is drawn for the last time
-//                        if (mOverdrawChild === prevSelected.itemView) {
-//                            removeChildDrawingOrderCallbackIfNecessary(prevSelected.itemView)
+//                        if (swipeDir <= 0) {
+//                            // this is a drag or failed swipe. recover immediately
+////                            mCallback.clearView(mRecyclerView, prevSelected)
+//                            mMovementView.translationX = 0f
+//                            // full cleanup will happen on onDrawOver
+//                        } else {
+//                            // wait until remove animation is complete.
+//                            mPendingCleanup.add(mViewHolder.itemView)
+//                            mIsPendingCleanup = true
+//                            if (swipeDir > 0) {
+//                                // Animation might be ended by other animators during a layout.
+//                                // We defer callback to avoid editing adapter during a layout.
+////                                postDispatchSwipe(this, swipeDir)
+//                            }
 //                        }
+//                        // removed from the list after it is drawn for the last time
+////                        if (mOverdrawChild === prevSelected.itemView) {
+////                            removeChildDrawingOrderCallbackIfNecessary(prevSelected.itemView)
+////                        }
                     }
                 }
                 rv.setDuration(DEFAULT_SWIPE_ANIMATION_DURATION)
                 mRecoverAnimations.add(rv)
                 rv.start()
-                preventLayout = true
-            } else {
-//                removeChildDrawingOrderCallbackIfNecessary(prevSelected.itemView)
-//                mCallback.clearView(mRecyclerView, prevSelected)
             }
             mSelected = false
         }
@@ -348,79 +337,83 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
             mSelected = true
 
         }
-
-//        if (!preventLayout) {
-//            mRecyclerView.getLayoutManager().requestSimpleAnimationsInNextLayout()
-//        }
-//        mCallback.onSelectedChanged(mSelected, mActionState)
-//        mRecyclerView.invalidate()
     }
 
-    //    internal fun postDispatchSwipe(anim: RecoverAnimation, swipeDir: Int) {
-//        // wait until animations are complete.
-//        mRecyclerView.post(object : Runnable {
-//            override fun run() {
-//                if (mRecyclerView != null && mRecyclerView.isAttachedToWindow()
-//                        && !anim.mOverridden
-//                        && anim.mViewHolder.adapterPosition != RecyclerView.NO_POSITION) {
-//                    val animator = mRecyclerView.getItemAnimator()
-//                    // if animator is running or we have other active recover animations, we try
-//                    // not to call onSwiped because DefaultItemAnimator is not good at merging
-//                    // animations. Instead, we wait and batch.
-//                    if ((animator == null || !animator!!.isRunning(null)) && !hasRunningRecoverAnim()) {
-//                        mCallback.onSwiped(anim.mViewHolder, swipeDir)
-//                    } else {
-//                        mRecyclerView.post(this)
+
+    private fun calculateTargetTranslateX(): Float {
+
+        var swipeDir = 0
+        var targetTranslateX: Float = 0f
+        if (mSelectedFlags and (LEFT or RIGHT) != 0) {
+            val dirFlag = if (mDx > 0) RIGHT else LEFT
+//            mVelocityTracker?.let { tracker ->
+//                if (mActivePointerId > -1) {
+//                    tracker.computeCurrentVelocity(PIXELS_PER_SECOND, mMaxSwipeVelocity)
+//                    val xVelocity = tracker.getXVelocity(mActivePointerId)
+//                    val yVelocity = tracker.getYVelocity(mActivePointerId)
+//                    val velDirFlag = if (xVelocity > 0f) RIGHT else LEFT
+//                    val absXVelocity = Math.abs(xVelocity)
+//                    if (velDirFlag and mSelectedFlags != 0 && dirFlag == velDirFlag
+//                            && absXVelocity >= mSwipeEscapeVelocity
+//                            && absXVelocity > Math.abs(yVelocity)) {
+//                        swipeDir = velDirFlag
 //                    }
 //                }
 //            }
-//        })
-//    }
 //
+//            releaseVelocityTracker()
+
+            if (swipeDir == 0) {
+
+                val thresholdToHalf = mMovementView.width.toFloat() * 0.2f
+                val thresholdToFull = mMovementView.width.toFloat() * 0.7f
+                if (mSelectedFlags and dirFlag != 0 && Math.abs(mDx) > thresholdToFull) {
+                    swipeDir = dirFlag
+                    targetTranslateX = Math.signum(mDx) * mViewHolder.itemView.width
+                } else if (mSelectedFlags and dirFlag != 0 && Math.abs(mDx) > thresholdToHalf) {
+                    swipeDir = dirFlag
+                    targetTranslateX = Math.signum(mDx) * mViewHolder.itemView.width * 0.5f
+                }
+
+            }
+        }
+
+        // find where we should animate to
+
+//        when (swipeDir) {
+//            LEFT, RIGHT, START, END -> {
+//                targetTranslateX = Math.signum(mDx) * mViewHolder.itemView.width
+//            }
+//            else -> {
+//                targetTranslateX = 0f
+//            }
+//        }
+        return targetTranslateX
+    }
+
+    private fun setViewItemState(dx: Float) {
+        if (dx.absoluteValue >= 0.25f * mMovementView.width && dx.absoluteValue < 0.7f * mMovementView.width) {
+            mItem.setStateHalfSwiped(true)
+            mSelectedFlags = LEFT and RIGHT
+        } else if (dx.absoluteValue >= 0.7f * mMovementView.width) {
+            //swiped
+        } else {
+            mItem.setStateHalfSwiped(false)
+            mSelectedFlags = LEFT
+        }
+    }
+
     private fun getSelectedDxDy(outPosition: FloatArray) {
         if (mSelectedFlags and (LEFT or RIGHT) != 0) {
             outPosition[0] = mSelectedStartX + mDx - mViewHolder.itemView.left
         } else {
             outPosition[0] = mViewHolder.itemView.translationX
         }
-        if (mSelectedFlags and (UP or DOWN) != 0) {
-            outPosition[1] = mSelectedStartY + mDy - mViewHolder.itemView.top
-        } else {
-            outPosition[1] = mViewHolder.itemView.translationY
-        }
-    }
-
-    private fun checkHorizontalSwipe(flags: Int): Int {
-        if (flags and (LEFT or RIGHT) != 0) {
-            val dirFlag = if (mDx > 0) RIGHT else LEFT
-            mVelocityTracker?.let { tracker ->
-                if (mActivePointerId > -1) {
-                    tracker.computeCurrentVelocity(PIXELS_PER_SECOND, mMaxSwipeVelocity)
-                    val xVelocity = tracker.getXVelocity(mActivePointerId)
-                    val yVelocity = tracker.getYVelocity(mActivePointerId)
-                    val velDirFlag = if (xVelocity > 0f) RIGHT else LEFT
-                    val absXVelocity = Math.abs(xVelocity)
-                    if (velDirFlag and flags != 0 && dirFlag == velDirFlag
-                            && absXVelocity >= mSwipeEscapeVelocity
-                            && absXVelocity > Math.abs(yVelocity)) {
-                        return velDirFlag
-                    }
-                }
-            }
-
-            val threshold = mViewHolder.itemView.width * 0.5
-
-            if (flags and dirFlag != 0 && Math.abs(mDx) > threshold) {
-                return dirFlag
-            }
-        }
-        return 0
     }
 
 
     internal fun updateDxDy(ev: MotionEvent, directionFlags: Int, pointerIndex: Int) {
         val x = ev.getX(pointerIndex)
-        val y = ev.getY(pointerIndex)
 
         // Calculate the distance moved
         mDx = x - mInitialTouchX
@@ -436,46 +429,17 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
         mMovementView.translationY = mDy
     }
 
-//    private fun swipeIfNecessary(): Int {
-//
-//        val originalMovementFlags = LEFT
-//        val absoluteMovementFlags =LEFT
-//        val flags = LEFT
-//        if (flags == 0) {
-//            return 0
-//        }
-//        val originalFlags = originalMovementFlags and ACTION_MODE_SWIPE_MASK shr ACTION_STATE_SWIPE * DIRECTION_FLAG_COUNT
-//        var swipeDir: Int
-//        if (Math.abs(mDx) > Math.abs(mDy)) {
-//            if ((swipeDir = checkHorizontalSwipe(flags)) > 0) {
-//                // if swipe dir is not in original flags, it should be the relative direction
-//                return if (originalFlags and swipeDir == 0) {
-//                    // convert to relative
-//                    Callback.convertToRelativeDirection(swipeDir,
-//                            ViewCompat.getLayoutDirection(mRecyclerView))
-//                } else swipeDir
-//            }
-//
-//        }
-//        return 0
-//    }
-
     private open class RecoverAnimation internal constructor(internal val mViewHolder: RecyclerView.ViewHolder,
                                                              internal val mView: View,
-                                                             internal val mAnimationType: Int,
                                                              internal val mActionState: Int,
                                                              internal val mStartDx: Float,
-                                                             internal val mStartDy: Float,
-                                                             internal val mTargetX: Float,
-                                                             internal val mTargetY: Float) : Animator.AnimatorListener {
+                                                             internal val mTargetX: Float) : Animator.AnimatorListener {
 
-        private val mValueAnimator: ValueAnimator
+        private val mValueAnimator: ValueAnimator = ValueAnimator.ofFloat(0f, 1f)
 
         var mIsPendingCleanup: Boolean = false
 
         internal var mX: Float = 0.toFloat()
-
-        internal var mY: Float = 0.toFloat()
 
         // if user starts touching a recovering view, we put it into interaction mode again,
         // instantly.
@@ -486,9 +450,10 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
         private var mFraction: Float = 0.toFloat()
 
         init {
-            mValueAnimator = ValueAnimator.ofFloat(0f, 1f)
-            mValueAnimator.addUpdateListener { animation -> setFraction(animation.animatedFraction)
-            update()}
+            mValueAnimator.addUpdateListener { animation ->
+                setFraction(animation.animatedFraction)
+                update()
+            }
             mValueAnimator.setTarget(mView)
             mValueAnimator.addListener(this)
             setFraction(0f)
@@ -521,13 +486,7 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
             } else {
                 mX = mStartDx + mFraction * (mTargetX - mStartDx)
             }
-            if (mStartDy == mTargetY) {
-                mY = mViewHolder.itemView.translationY
-            } else {
-                mY = mStartDy + mFraction * (mTargetY - mStartDy)
-            }
             mView.translationX = mX
-            mView.translationY = mY
         }
 
         override fun onAnimationStart(animation: Animator) {
@@ -553,19 +512,18 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
     /**
      * Returns the animation type or 0 if cannot be found.
      */
-    internal fun endRecoverAnimation(override: Boolean): Int {
+    private fun endRecoverAnimation(override: Boolean) {
         val recoverAnimSize = mRecoverAnimations.size
         for (i in recoverAnimSize - 1 downTo 0) {
-            val anim = mRecoverAnimations.get(i)
+            val anim = mRecoverAnimations[i]
             if (anim.mViewHolder === mViewHolder) {
                 anim.mOverridden = anim.mOverridden or override
                 if (!anim.mEnded) {
                     anim.cancel()
                 }
                 mRecoverAnimations.removeAt(i)
-                return anim.mAnimationType
+                return
             }
         }
-        return 0
     }
 }

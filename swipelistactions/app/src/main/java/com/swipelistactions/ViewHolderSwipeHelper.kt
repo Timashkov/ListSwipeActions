@@ -115,83 +115,79 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
     private var mRecoverAnimations: MutableList<RecoverAnimation> = ArrayList()
     private var mSelected = false
 
-    private val mOnItemTouchListener = object : View.OnTouchListener {
-        override fun onTouch(v: View?, event: MotionEvent?): Boolean {
-            event?.let {
-                val action = event.actionMasked
+    private val mOnItemTouchListener = View.OnTouchListener { v, event ->
+        event?.let {
+            val action = event.actionMasked
 
-                when (action) {
+            when (action) {
 
-                    MotionEvent.ACTION_DOWN -> {
-                        mActivePointerId = event.getPointerId(0)
-                        mInitialTouchX = event.x + mMovementView.translationX
-                        mInitialTouchY = event.y
-                        obtainVelocityTracker()
-                        if (!mSelected) {
-                            val animation = findAnimation(event)
-                            if (animation != null) {
-                                mInitialTouchX -= animation.mX
-                                mInitialTouchY -= animation.mY
-                                endRecoverAnimation(true)
-                                if (mPendingCleanup.remove(animation.mViewHolder.itemView)) {
+                MotionEvent.ACTION_DOWN -> {
+                    mActivePointerId = event.getPointerId(0)
+                    mInitialTouchX = event.x + mMovementView.translationX
+                    mInitialTouchY = event.y
+                    obtainVelocityTracker()
+                    if (!mSelected) {
+                        val animation = findAnimation(event)
+                        if (animation != null) {
+                            mInitialTouchX -= animation.mX
+                            mInitialTouchY -= animation.mY
+                            endRecoverAnimation(true)
+                            if (mPendingCleanup.remove(animation.mViewHolder.itemView)) {
 //                                    mCallback.clearView(mRecyclerView, animation.mViewHolder)
-                                }
-                                select(animation.mActionState)
-                                updateDxDy(event, mSelectedFlags, 0)
                             }
-                        }
-                        return true
-                    }
-
-                    MotionEvent.ACTION_MOVE -> {
-
-                        mVelocityTracker?.addMovement(event)
-                        if (mActivePointerId == ItemTouchHelper.ACTIVE_POINTER_ID_NONE) {
-                            return false
-                        }
-
-                        val activePointerIndex = event.findPointerIndex(mActivePointerId)
-                        if (activePointerIndex >= 0) {
-                            checkSelectForSwipe(action, event, activePointerIndex)
-                        }
-                        if (!mSelected) return false
-                        // Find the index of the active pointer and fetch its position
-                        if (activePointerIndex >= 0) {
-                            updateDxDy(event, mSelectedFlags, activePointerIndex)
-                            return true
+                            select(animation.mActionState)
+                            updateDxDy(event, mSelectedFlags, 0)
                         }
                     }
-                    MotionEvent.ACTION_CANCEL -> {
-                        mVelocityTracker?.clear()
-                        select(ACTION_STATE_IDLE)
-                        mActivePointerId = ItemTouchHelper.ACTIVE_POINTER_ID_NONE
-                        return true
-                    }
-                    // fall through
-                    MotionEvent.ACTION_UP -> {
-                        select(ACTION_STATE_IDLE)
-                        mActivePointerId = ItemTouchHelper.ACTIVE_POINTER_ID_NONE
-                        return true
-                    }
-                    MotionEvent.ACTION_POINTER_UP -> {
-                        val pointerIndex = event.actionIndex
-                        val pointerId = event.getPointerId(pointerIndex)
-                        if (pointerId == mActivePointerId) {
-                            // This was our active pointer going up. Choose a new
-                            // active pointer and adjust accordingly.
-                            val newPointerIndex = if (pointerIndex == 0) 1 else 0
-                            mActivePointerId = event.getPointerId(newPointerIndex)
-                            updateDxDy(event, mSelectedFlags, pointerIndex)
-                        }
-                        return true
-                    }
-                    else -> return false
+                    return@OnTouchListener true
                 }
+
+                MotionEvent.ACTION_MOVE -> {
+
+                    mVelocityTracker?.addMovement(event)
+                    if (mActivePointerId == ItemTouchHelper.ACTIVE_POINTER_ID_NONE) {
+                        return@OnTouchListener false
+                    }
+
+                    val activePointerIndex = event.findPointerIndex(mActivePointerId)
+                    if (activePointerIndex >= 0) {
+                        checkSelectForSwipe(action, event, activePointerIndex)
+                    }
+                    if (!mSelected) return@OnTouchListener false
+                    // Find the index of the active pointer and fetch its position
+                    if (activePointerIndex >= 0) {
+                        updateDxDy(event, mSelectedFlags, activePointerIndex)
+                        return@OnTouchListener true
+                    }
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    mVelocityTracker?.clear()
+                    select(ACTION_STATE_IDLE)
+                    mActivePointerId = ItemTouchHelper.ACTIVE_POINTER_ID_NONE
+                    return@OnTouchListener true
+                }
+                // fall through
+                MotionEvent.ACTION_UP -> {
+                    select(ACTION_STATE_IDLE)
+                    mActivePointerId = ItemTouchHelper.ACTIVE_POINTER_ID_NONE
+                    return@OnTouchListener true
+                }
+                MotionEvent.ACTION_POINTER_UP -> {
+                    val pointerIndex = event.actionIndex
+                    val pointerId = event.getPointerId(pointerIndex)
+                    if (pointerId == mActivePointerId) {
+                        // This was our active pointer going up. Choose a new
+                        // active pointer and adjust accordingly.
+                        val newPointerIndex = if (pointerIndex == 0) 1 else 0
+                        mActivePointerId = event.getPointerId(newPointerIndex)
+                        updateDxDy(event, mSelectedFlags, pointerIndex)
+                    }
+                    return@OnTouchListener true
+                }
+                else -> return@OnTouchListener false
             }
-            return false
         }
-
-
+        false
     }
 
     private var mSlop: Int = 0
@@ -344,7 +340,9 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
             mSelected = false
         }
         if (actionState == ACTION_STATE_SWIPE) {
-            mSelectedFlags = LEFT
+            if (mItem.getStateHalfSwiped())
+                mSelectedFlags = RIGHT
+            mSelectedFlags = mSelectedFlags and LEFT
             mSelectedStartX = mViewHolder.itemView.left.toFloat()
             mSelectedStartY = mViewHolder.itemView.top.toFloat()
             mSelected = true

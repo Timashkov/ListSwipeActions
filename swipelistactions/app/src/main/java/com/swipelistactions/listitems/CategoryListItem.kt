@@ -15,11 +15,17 @@ class CategoryListItem(private val mId: Int) : ListItem {
         mIsCollapsed = isCollapsed
     }
 
-    override fun getStateCollapsed(): Boolean = mIsCollapsed
+    override fun isStateCollapsed(): Boolean = mIsCollapsed
 
     override fun setStateHalfSwiped(isSwiped: Boolean) {
         mHalfSwiped = isSwiped
     }
 
     override fun getStateHalfSwiped(): Boolean = mHalfSwiped
+
+    override fun getId(): Int = mId
+
+    override fun getParentId(): Int = mId
+
+    override fun isCategory(): Boolean = true
 }

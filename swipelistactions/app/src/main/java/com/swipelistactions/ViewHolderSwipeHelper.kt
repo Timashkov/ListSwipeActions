@@ -1,121 +1,46 @@
 package com.swipelistactions
 
 import android.animation.Animator
-import android.animation.ValueAnimator
-import android.graphics.Canvas
-import android.support.v4.view.ViewCompat
-import android.support.v7.recyclerview.R
 import android.support.v7.widget.RecyclerView
+import android.util.Log
 import android.view.*
-import com.swipelistactions.ItemTouchHelper.*
-import com.swipelistactions.listitems.ListItem
+import com.swipelistactions.animations.IItemState
+import com.swipelistactions.animations.IOnMove
 import java.util.ArrayList
-import kotlin.math.absoluteValue
+import com.swipelistactions.animations.RecoverAnimation
 
 /**
  * Created by Aleksei Timashkov on 06.08.18.
  */
-class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder: RecyclerView.ViewHolder, private val mMovementView: View) {
-
-    val DEFAULT_SWIPE_ANIMATION_DURATION = 250L
-    /**
-     * Left direction, used for swipe & drag control.
-     */
-    val LEFT = 1 shl 2
-
-    /**
-     * Right direction, used for swipe & drag control.
-     */
-    val RIGHT = 1 shl 3
-
-    // If you change these relative direction values, update Callback#convertToAbsoluteDirection,
-    // Callback#convertToRelativeDirection.
-    /**
-     * Horizontal start direction. Resolved to LEFT or RIGHT depending on RecyclerView's layout
-     * direction. Used for swipe & drag control.
-     */
-    val START = LEFT shl 2
-
-    /**
-     * Horizontal end direction. Resolved to LEFT or RIGHT depending on RecyclerView's layout
-     * direction. Used for swipe & drag control.
-     */
-    val END = RIGHT shl 2
-
-    /**
-     * ItemTouchHelper is in idle state. At this state, either there is no related motion event by
-     * the user or latest motion events have not yet triggered a swipe or drag.
-     */
-    val ACTION_STATE_IDLE = 0
-
-    /**
-     * A View is currently being swiped.
-     */
-    val ACTION_STATE_SWIPE = 1
-
-    /**
-     * Animation type for views which are swiped successfully.
-     */
-    val ANIMATION_TYPE_SWIPE_SUCCESS = 1 shl 1
-
-    /**
-     * Animation type for views which are not completely swiped thus will animate back to their
-     * original position.
-     */
-    val ANIMATION_TYPE_SWIPE_CANCEL = 1 shl 2
+class ViewHolderSwipeHelper(private val mItemState: IItemState, private val mViewHolder: RecyclerView.ViewHolder, private val mMovementView: View, private val mOnMove: IOnMove) {
 
 
     /**
      * The reference coordinates for the action start. For drag & drop, this is the time long
      * press is completed vs for swipe, this is the initial touch point.
      */
-    internal var mInitialTouchX: Float = 0.toFloat()
-
-    internal var mInitialTouchY: Float = 0.toFloat()
-
-    /**
-     * Set when ItemTouchHelper is assigned to a RecyclerView.
-     */
-    internal var mSwipeEscapeVelocity: Float = 0.toFloat()
-
-    /**
-     * Set when ItemTouchHelper is assigned to a RecyclerView.
-     */
-    internal var mMaxSwipeVelocity: Float = 0.toFloat()
+    private var mInitialTouchX: Float = 0.toFloat()
+    private var mInitialTouchY: Float = 0.toFloat()
 
     /**
      * The diff between the last event and initial touch.
      */
-    internal var mDx: Float = 0.toFloat()
+    private var mDx: Float = 0.toFloat()
 
-    internal var mDy: Float = 0.toFloat()
-
-    internal val mPendingCleanup: MutableList<View> = ArrayList()
-
-    internal var mActionState = ACTION_STATE_IDLE
+    private var mActionState = ACTION_STATE_IDLE
     /**
      * The coordinates of the selected view at the time it is selected. We record these values
      * when action starts so that we can consistently position it even if LayoutManager moves the
      * View.
      */
-    internal var mSelectedStartX: Float = 0.toFloat()
+    private var mSelectedStartX: Float = 0.toFloat()
+    private var mSelectedStartY: Float = 0.toFloat()
 
-    internal var mSelectedStartY: Float = 0.toFloat()
-
-    /**
-     * The direction flags obtained from unmasking
-     * [Callback.getAbsoluteMovementFlags] for the current
-     * action state.
-     */
-    internal var mSelectedFlags: Int = LEFT
-
-    private val PIXELS_PER_SECOND = 1000
-
-    private var mVelocityTracker: VelocityTracker? = null
     private var mActivePointerId = ACTIVE_POINTER_ID_NONE
 
     private var mRecoverAnimations: MutableList<RecoverAnimation> = ArrayList()
     private var mSelected = false
+    private var mSlop: Int = 0
 
 
     private val mOnItemTouchListener = View.OnTouchListener { v, event ->
@@ -126,18 +51,13 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
 
                 MotionEvent.ACTION_DOWN -> {
                     mActivePointerId = event.getPointerId(0)
-                    mInitialTouchX = event.x + mMovementView.translationX
-                    obtainVelocityTracker()
+                    mInitialTouchX = event.x - mMovementView.translationX
                     if (!mSelected) {
                         val animation = findAnimation()
                         if (animation != null) {
-                            mInitialTouchX -= animation.mX
                             endRecoverAnimation(true)
-                            if (mPendingCleanup.remove(animation.mViewHolder.itemView)) {
-//                                    mCallback.clearView(mRecyclerView, animation.mViewHolder)
-                            }
                             select(animation.mActionState)
-                            updateDxDy(event, mSelectedFlags, 0)
+                            updateDxDy(event, 0)
                         }
                     }
                     return@OnTouchListener true
@@ -145,8 +65,7 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
 
                 MotionEvent.ACTION_MOVE -> {
 
-                    mVelocityTracker?.addMovement(event)
-                    if (mActivePointerId == ItemTouchHelper.ACTIVE_POINTER_ID_NONE) {
+                    if (mActivePointerId == ACTIVE_POINTER_ID_NONE) {
                         return@OnTouchListener false
                     }
 
@@ -157,31 +76,28 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
                     if (!mSelected) return@OnTouchListener false
                     // Find the index of the active pointer and fetch its position
                     if (activePointerIndex >= 0) {
-                        updateDxDy(event, mSelectedFlags, activePointerIndex)
+                        updateDxDy(event, activePointerIndex)
                         return@OnTouchListener true
                     }
                 }
                 MotionEvent.ACTION_CANCEL -> {
-                    mVelocityTracker?.clear()
                     select(ACTION_STATE_IDLE)
-                    mActivePointerId = ItemTouchHelper.ACTIVE_POINTER_ID_NONE
+                    mActivePointerId = ACTIVE_POINTER_ID_NONE
                     return@OnTouchListener true
                 }
                 // fall through
                 MotionEvent.ACTION_UP -> {
                     select(ACTION_STATE_IDLE)
-                    mActivePointerId = ItemTouchHelper.ACTIVE_POINTER_ID_NONE
+                    mActivePointerId = ACTIVE_POINTER_ID_NONE
                     return@OnTouchListener true
                 }
                 MotionEvent.ACTION_POINTER_UP -> {
                     val pointerIndex = event.actionIndex
                     val pointerId = event.getPointerId(pointerIndex)
                     if (pointerId == mActivePointerId) {
-                        // This was our active pointer going up. Choose a new
-                        // active pointer and adjust accordingly.
                         val newPointerIndex = if (pointerIndex == 0) 1 else 0
                         mActivePointerId = event.getPointerId(newPointerIndex)
-                        updateDxDy(event, mSelectedFlags, pointerIndex)
+                        updateDxDy(event, pointerIndex)
                     }
                     return@OnTouchListener true
                 }
@@ -191,28 +107,17 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
         false
     }
 
-    private var mSlop: Int = 0
+    private fun getSelectedFlags(): Int {
+        var flag = DIRECTION_LEFT
+        if (mItemState.getStateHalfSwiped())
+            flag = flag or DIRECTION_RIGHT
+        return flag
+    }
 
     init {
         mViewHolder.itemView.setOnTouchListener(mOnItemTouchListener)
         val vc = ViewConfiguration.get(mViewHolder.itemView.context)
         mSlop = vc.scaledTouchSlop
-        mSwipeEscapeVelocity = mMovementView.context.resources
-                .getDimension(R.dimen.item_touch_helper_swipe_escape_velocity)
-        mMaxSwipeVelocity = mMovementView.context.resources
-                .getDimension(R.dimen.item_touch_helper_swipe_escape_max_velocity)
-
-    }
-
-    private fun obtainVelocityTracker() {
-        mVelocityTracker?.recycle()
-        mVelocityTracker = VelocityTracker.obtain()
-    }
-
-    private fun releaseVelocityTracker() {
-        mVelocityTracker?.recycle()
-        mVelocityTracker = null
-
     }
 
     private fun findAnimation(): RecoverAnimation? {
@@ -232,7 +137,7 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
     /**
      * Checks whether we should select a View for swiping.
      */
-    internal fun checkSelectForSwipe(action: Int, motionEvent: MotionEvent, pointerIndex: Int): Boolean {
+    private fun checkSelectForSwipe(action: Int, motionEvent: MotionEvent, pointerIndex: Int): Boolean {
         if (mSelected || action != MotionEvent.ACTION_MOVE) {
             return false
         }
@@ -276,50 +181,20 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
 
             if (mViewHolder.itemView.parent != null) {
 
-
-                val targetTranslateX = calculateTargetTranslateX()
-
+                val targetTranslateX = mOnMove.getSwipeTarget(mDx, getSelectedFlags())
 
                 val tmpPosition = FloatArray(2)
                 getSelectedDxDy(tmpPosition)
                 val currentTranslateX = tmpPosition[0]
 
-                val rv = object :RecoverAnimation(mViewHolder, mMovementView,
-                        prevActionState, currentTranslateX, targetTranslateX)
-                {
+                val rv = object : RecoverAnimation(mViewHolder, mMovementView,
+                        prevActionState, currentTranslateX, targetTranslateX) {
                     override fun onAnimationEnd(animation: Animator) {
                         super.onAnimationEnd(animation)
                         if (this.mOverridden) {
                             return
                         }
-                        val thresholdToHalf = mMovementView.width.toFloat() * 0.2f
-                        val thresholdToFull = mMovementView.width.toFloat() * 0.7f
-                        if (targetTranslateX.absoluteValue >= thresholdToFull ){
-                            //TODO: cleanup
-                        } else if(targetTranslateX.absoluteValue >= thresholdToHalf) {
-                            mItem.setStateHalfSwiped(true)
-                        } else {
-                            mItem.setStateHalfSwiped(false)
-                        }
-//                        if (swipeDir <= 0) {
-//                            // this is a drag or failed swipe. recover immediately
-////                            mCallback.clearView(mRecyclerView, prevSelected)
-//                            mMovementView.translationX = 0f
-//                            // full cleanup will happen on onDrawOver
-//                        } else {
-//                            // wait until remove animation is complete.
-//                            mPendingCleanup.add(mViewHolder.itemView)
-//                            mIsPendingCleanup = true
-//                            if (swipeDir > 0) {
-//                                // Animation might be ended by other animators during a layout.
-//                                // We defer callback to avoid editing adapter during a layout.
-////                                postDispatchSwipe(this, swipeDir)
-//                            }
-//                        }
-//                        // removed from the list after it is drawn for the last time
-////                        if (mOverdrawChild === prevSelected.itemView) {
-////                            removeChildDrawingOrderCallbackIfNecessary(prevSelected.itemView)
-////                        }
+                        mOnMove.updateSwipedState(targetTranslateX)
                     }
                 }
                 rv.setDuration(DEFAULT_SWIPE_ANIMATION_DURATION)
@@ -329,185 +204,37 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
             mSelected = false
         }
         if (actionState == ACTION_STATE_SWIPE) {
-            if (mItem.getStateHalfSwiped())
-                mSelectedFlags = RIGHT
-            mSelectedFlags = mSelectedFlags and LEFT
             mSelectedStartX = mViewHolder.itemView.left.toFloat()
             mSelectedStartY = mViewHolder.itemView.top.toFloat()
             mSelected = true
-
         }
     }
 
-
-    private fun calculateTargetTranslateX(): Float {
-
-        var swipeDir = 0
-        var targetTranslateX: Float = 0f
-        if (mSelectedFlags and (LEFT or RIGHT) != 0) {
-            val dirFlag = if (mDx > 0) RIGHT else LEFT
-//            mVelocityTracker?.let { tracker ->
-//                if (mActivePointerId > -1) {
-//                    tracker.computeCurrentVelocity(PIXELS_PER_SECOND, mMaxSwipeVelocity)
-//                    val xVelocity = tracker.getXVelocity(mActivePointerId)
-//                    val yVelocity = tracker.getYVelocity(mActivePointerId)
-//                    val velDirFlag = if (xVelocity > 0f) RIGHT else LEFT
-//                    val absXVelocity = Math.abs(xVelocity)
-//                    if (velDirFlag and mSelectedFlags != 0 && dirFlag == velDirFlag
-//                            && absXVelocity >= mSwipeEscapeVelocity
-//                            && absXVelocity > Math.abs(yVelocity)) {
-//                        swipeDir = velDirFlag
-//                    }
-//                }
-//            }
-//
-//            releaseVelocityTracker()
-
-            if (swipeDir == 0) {
-
-                val thresholdToHalf = mMovementView.width.toFloat() * 0.2f
-                val thresholdToFull = mMovementView.width.toFloat() * 0.7f
-                if (mSelectedFlags and dirFlag != 0 && Math.abs(mDx) > thresholdToFull) {
-                    swipeDir = dirFlag
-                    targetTranslateX = Math.signum(mDx) * mViewHolder.itemView.width
-                } else if (mSelectedFlags and dirFlag != 0 && Math.abs(mDx) > thresholdToHalf) {
-                    swipeDir = dirFlag
-                    targetTranslateX = Math.signum(mDx) * mViewHolder.itemView.width * 0.5f
-                }
-
-            }
-        }
-
-        // find where we should animate to
-
-//        when (swipeDir) {
-//            LEFT, RIGHT, START, END -> {
-//                targetTranslateX = Math.signum(mDx) * mViewHolder.itemView.width
-//            }
-//            else -> {
-//                targetTranslateX = 0f
-//            }
-//        }
-        return targetTranslateX
-    }
-
-    private fun setViewItemState(dx: Float) {
-        if (dx.absoluteValue >= 0.25f * mMovementView.width && dx.absoluteValue < 0.7f * mMovementView.width) {
-            mItem.setStateHalfSwiped(true)
-            mSelectedFlags = LEFT and RIGHT
-        } else if (dx.absoluteValue >= 0.7f * mMovementView.width) {
-            //swiped
-        } else {
-            mItem.setStateHalfSwiped(false)
-            mSelectedFlags = LEFT
-        }
-    }
 
     private fun getSelectedDxDy(outPosition: FloatArray) {
-        if (mSelectedFlags and (LEFT or RIGHT) != 0) {
-            outPosition[0] = mSelectedStartX + mDx - mViewHolder.itemView.left
+        if (getSelectedFlags() and (DIRECTION_LEFT or DIRECTION_RIGHT) != 0) {
+            outPosition[0] = mSelectedStartX + mDx - mMovementView.left
         } else {
-            outPosition[0] = mViewHolder.itemView.translationX
+            outPosition[0] = mMovementView.translationX
         }
     }
 
 
-    internal fun updateDxDy(ev: MotionEvent, directionFlags: Int, pointerIndex: Int) {
+    private fun updateDxDy(ev: MotionEvent, pointerIndex: Int) {
         val x = ev.getX(pointerIndex)
 
+        val directionFlags = getSelectedFlags()
         // Calculate the distance moved
         mDx = x - mInitialTouchX
-        mDy = 0f
-        if (directionFlags and LEFT == 0) {
-            mDx = Math.max(0f, mDx)
-        }
-        if (directionFlags and RIGHT == 0) {
+
+        if (directionFlags and DIRECTION_RIGHT == 0) {
             mDx = Math.min(0f, mDx)
         }
 
         mMovementView.translationX = mDx
-        mMovementView.translationY = mDy
+        Log.d(TAG, "New DX $mDx")
     }
 
-    private open class RecoverAnimation internal constructor(internal val mViewHolder: RecyclerView.ViewHolder,
-                                                             internal val mView: View,
-                                                             internal val mActionState: Int,
-                                                             internal val mStartDx: Float,
-                                                             internal val mTargetX: Float) : Animator.AnimatorListener {
-
-        private val mValueAnimator: ValueAnimator = ValueAnimator.ofFloat(0f, 1f)
-
-        var mIsPendingCleanup: Boolean = false
-
-        internal var mX: Float = 0.toFloat()
-
-        // if user starts touching a recovering view, we put it into interaction mode again,
-        // instantly.
-        internal var mOverridden = false
-
-        internal var mEnded = false
-
-        private var mFraction: Float = 0.toFloat()
-
-        init {
-            mValueAnimator.addUpdateListener { animation ->
-                setFraction(animation.animatedFraction)
-                update()
-            }
-            mValueAnimator.setTarget(mView)
-            mValueAnimator.addListener(this)
-            setFraction(0f)
-        }
-
-        fun setDuration(duration: Long) {
-            mValueAnimator.duration = duration
-        }
-
-        fun start() {
-            mViewHolder.setIsRecyclable(false)
-            mValueAnimator.start()
-        }
-
-        fun cancel() {
-            mValueAnimator.cancel()
-        }
-
-        fun setFraction(fraction: Float) {
-            mFraction = fraction
-        }
-
-        /**
-         * We run updates on onDraw method but use the fraction from animator callback.
-         * This way, we can sync translate x/y values w/ the animators to avoid one-off frames.
-         */
-        fun update() {
-            if (mStartDx == mTargetX) {
-                mX = mViewHolder.itemView.translationX
-            } else {
-                mX = mStartDx + mFraction * (mTargetX - mStartDx)
-            }
-            mView.translationX = mX
-        }
-
-        override fun onAnimationStart(animation: Animator) {
-
-        }
-
-        override fun onAnimationEnd(animation: Animator) {
-            if (!mEnded) {
-                mViewHolder.setIsRecyclable(true)
-            }
-            mEnded = true
-        }
-
-        override fun onAnimationCancel(animation: Animator) {
-            setFraction(1f) //make sure we recover the view's state.
-        }
-
-        override fun onAnimationRepeat(animation: Animator) {
-
-        }
-    }
 
     /**
      * Returns the animation type or 0 if cannot be found.
@@ -525,5 +252,16 @@ class ViewHolderSwipeHelper(private val mItem: ListItem, private val mViewHolder
                 return
             }
         }
+    }
+
+    companion object {
+        const val TAG = "ViewHolderSwipeHelper"
+        const val DEFAULT_SWIPE_ANIMATION_DURATION = 250L
+        const val DIRECTION_LEFT = 1 shl 2
+        const val DIRECTION_RIGHT = 1 shl 3
+
+        const val ACTIVE_POINTER_ID_NONE = -1
+        const val ACTION_STATE_IDLE = 0
+        const val ACTION_STATE_SWIPE = 1
     }
 }

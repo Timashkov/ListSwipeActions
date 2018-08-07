@@ -8,12 +8,14 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/colorChildBg"
+        android:padding="8dp"
         android:orientation="vertical">
+
         <TextView
             android:id="@+id/child_text_background"
             android:layout_width="match_parent"
-            android:gravity="left"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:gravity="right" />
     </LinearLayout>
 
     <LinearLayout
@@ -21,8 +23,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/colorChildFg"
-        android:padding="8dp"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:padding="8dp">
 
         <TextView
             android:id="@+id/child_text"

@@ -5,30 +5,28 @@
 
     <LinearLayout
         android:id="@+id/viewBackgroundCategory"
-        android:background="@color/colorCategoryBg"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="right"
+        android:background="@color/colorCategoryBg"
         android:orientation="vertical"
         android:padding="8dp">
 
         <TextView
             android:id="@+id/category_text_background"
-            android:layout_gravity="right"
-            android:gravity="right"
-            android:textColor="@color/colorAccent"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:gravity="right"
+            android:textColor="@color/colorAccent" />
 
     </LinearLayout>
 
     <LinearLayout
         android:id="@+id/viewForegroundCategory"
-        android:background="@color/colorPrimaryDark"
-        android:padding="8dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:background="@color/colorPrimaryDark"
+        android:orientation="vertical"
+        android:padding="8dp">
 
         <TextView
             android:id="@+id/category_text"

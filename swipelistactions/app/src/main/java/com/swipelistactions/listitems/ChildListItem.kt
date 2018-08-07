@@ -1,7 +1,7 @@
 package com.swipelistactions.listitems
 
-class ChildListItem(index: Int, val mParent: Int) : ListItem {
-    val mText = "Child #$index of parent#$mParent"
+class ChildListItem(private val mId: Int, private val mParentId: Int) : ListItem {
+    val mText = "Child #$mId of parent#$mParentId"
 
     override fun getText(): String = mText
     override fun getBackText(): String = "$mText background"
@@ -13,11 +13,17 @@ class ChildListItem(index: Int, val mParent: Int) : ListItem {
         mIsCollapsed = isCollapsed
     }
 
-    override fun getStateCollapsed(): Boolean = mIsCollapsed
+    override fun isStateCollapsed(): Boolean = mIsCollapsed
 
     override fun setStateHalfSwiped(isSwiped: Boolean) {
         mHalfSwiped = isSwiped
     }
 
     override fun getStateHalfSwiped(): Boolean = mHalfSwiped
+
+    override fun getId(): Int = mId
+
+    override fun getParentId(): Int = mParentId
+
+    override fun isCategory(): Boolean = false
 }

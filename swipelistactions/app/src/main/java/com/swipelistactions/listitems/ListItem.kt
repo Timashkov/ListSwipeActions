@@ -1,12 +1,16 @@
 package com.swipelistactions.listitems
 
-interface ListItem {
+import com.swipelistactions.animations.IItemState
+
+interface ListItem : IItemState{
     fun getText(): String
     fun getBackText(): String
+    fun isCategory(): Boolean
+    fun getId(): Int
+    fun getParentId(): Int
 
     fun setStateCollapsed(isCollapsed: Boolean)
-    fun getStateCollapsed(): Boolean
+    fun isStateCollapsed(): Boolean
 
     fun setStateHalfSwiped(isSwiped: Boolean)
-    fun getStateHalfSwiped(): Boolean
 }

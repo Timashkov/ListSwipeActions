@@ -6,4 +6,5 @@ package com.swipelistactions.animations
 interface IOnMove {
     fun updateSwipedState(translateX: Float)
     fun getSwipeTarget(dx: Float, selectedFlags: Int): Float
+    fun onClick()
 }

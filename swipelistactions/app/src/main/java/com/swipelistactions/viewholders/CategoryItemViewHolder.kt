@@ -25,8 +25,6 @@ class CategoryItemViewHolder(val view: View, private val mListCallback: IListCal
             viewForeground.translationX = 0f
         }
 
-        viewForeground.setOnClickListener { mListCallback.onItemClicked(listItem) }
-
         viewHolderSwipeHelper = ViewHolderSwipeHelper(listItem, this, viewForeground, object : IOnMove {
 
             val thresholdToHalf = viewForeground.width.toFloat() * 0.2f
@@ -52,6 +50,10 @@ class CategoryItemViewHolder(val view: View, private val mListCallback: IListCal
                 }
 
                 return targetTranslateX
+            }
+
+            override fun onClick() {
+                mListCallback.onItemClicked(listItem)
             }
         })
     }

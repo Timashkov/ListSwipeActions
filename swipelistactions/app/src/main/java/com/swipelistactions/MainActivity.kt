@@ -28,14 +28,18 @@ class MainActivity : AppCompatActivity(), IListCallback {
     override fun onItemClicked(item: ListItem) {
         if (item.isCategory()){
             val collapsed = item.isStateCollapsed()
-            item.setStateCollapsed(!collapsed)
+            mDataSet.find { it.getId() == item.getId() }?.setStateCollapsed(!collapsed)
+            val filtered = mDataSet.filterNot { it.getParentId() == item.getId() && !it.isCategory() }
+            mAdapter?.setData(filtered)
         }
     }
 
     override fun removeItem(item: ListItem) {
         if (item.isCategory()) {
             val newItems = mDataSet.filter { it.getParentId() != item.getId() }
-            mAdapter?.setData(newItems)
+            mDataSet.clear()
+            mDataSet.addAll(newItems)
+            mAdapter?.setData(mDataSet)
         }else{
             mDataSet.remove(item)
             mAdapter?.setData(mDataSet)

@@ -44,6 +44,10 @@ class ChildItemViewHolder(val view: View, private val mListCallback: IListCallba
 
                 return targetTranslateX
             }
+
+            override fun onClick() {
+                //nothing
+            }
         })
 
         if (listItem.getStateHalfSwiped()) {

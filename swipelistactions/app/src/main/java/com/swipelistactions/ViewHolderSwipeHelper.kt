@@ -87,6 +87,9 @@ class ViewHolderSwipeHelper(private val mItemState: IItemState, private val mVie
                 }
                 // fall through
                 MotionEvent.ACTION_UP -> {
+                    if (!mSelected) {
+                        mOnMove.onClick()
+                    }
                     select(ACTION_STATE_IDLE)
                     mActivePointerId = ACTIVE_POINTER_ID_NONE
                     return@OnTouchListener true
@@ -168,6 +171,7 @@ class ViewHolderSwipeHelper(private val mItemState: IItemState, private val mVie
     }
 
     private fun select(actionState: Int) {
+
         if (actionState == mActionState) {
             return
         }
@@ -186,6 +190,7 @@ class ViewHolderSwipeHelper(private val mItemState: IItemState, private val mVie
                 val tmpPosition = FloatArray(2)
                 getSelectedDxDy(tmpPosition)
                 val currentTranslateX = tmpPosition[0]
+
 
                 val rv = object : RecoverAnimation(mViewHolder, mMovementView,
                         prevActionState, currentTranslateX, targetTranslateX) {

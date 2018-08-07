@@ -17,7 +17,7 @@ class CategoryItemViewHolder(val view: View, private val mListCallback: IListCal
     var thresholdToFull: Float = 0.0f
     private var isHalfState = false
     fun setupItem(listItem: ListItem) {
-
+        isHalfState = listItem.getStateHalfSwiped()
         view.category_text.text = listItem.getText() + if (listItem.isStateCollapsed()) " Collapsed" else " Expanded"
         view.category_text_background.text = listItem.getBackText()
 
@@ -43,10 +43,10 @@ class CategoryItemViewHolder(val view: View, private val mListCallback: IListCal
 
                 if (selectedFlags and dirFlag != 0 && Math.abs(dx) > thresholdToFull) {
                     targetTranslateX = Math.signum(dx) * view.width
-                    Log.d("Category item vh" ,  " Full remove (threshold $thresholdToFull)")
+                    Log.d("Category item vh", " Full remove (threshold $thresholdToFull)")
                 } else if (selectedFlags and dirFlag != 0 && Math.abs(dx) > thresholdToHalf) {
                     targetTranslateX = Math.signum(dx) * view.width * 0.5f
-                    Log.d("Category item vh" ,  " Half swipe (threshold $thresholdToHalf)")
+                    Log.d("Category item vh", " Half swipe (threshold $thresholdToHalf)")
                 }
 
                 return targetTranslateX
@@ -58,20 +58,23 @@ class CategoryItemViewHolder(val view: View, private val mListCallback: IListCal
         })
     }
 
-    fun stopCallbacks(){
+    fun stopCallbacks() {
         viewHolderSwipeHelper?.stopCallbacks()
         viewHolderSwipeHelper = null
     }
 
-    fun refreshView(){
-        if (isHalfState) {
-            view.viewForegroundCategory.translationX = -view.viewForegroundCategory.width * 0.5f
-            view.invalidate()
-        } else {
-            view.viewForegroundCategory.translationX = 0f
+    fun refreshView() {
+        view.post {
+            if (isHalfState) {
+                view.viewForegroundCategory.translationX = -view.viewForegroundCategory.width * 0.5f
+                view.invalidate()
+            } else {
+                view.viewForegroundCategory.translationX = 0f
+            }
+            thresholdToHalf = view.viewForegroundCategory.width.toFloat() * 0.2f
+            thresholdToFull = view.viewForegroundCategory.width.toFloat() * 0.7f
+            Log.d("Category item vh", "Thresholds: $thresholdToFull $thresholdToHalf")
         }
-        thresholdToHalf = view.viewForegroundCategory.width.toFloat() * 0.2f
-        thresholdToFull = view.viewForegroundCategory.width.toFloat() * 0.7f
     }
 
 }

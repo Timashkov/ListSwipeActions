@@ -137,9 +137,6 @@ class ViewHolderSwipeHelper(private val mItemState: IItemState, private val mVie
     }
 
 
-    /**
-     * Checks whether we should select a View for swiping.
-     */
     private fun checkSelectForSwipe(action: Int, motionEvent: MotionEvent, pointerIndex: Int): Boolean {
         if (mSelected || action != MotionEvent.ACTION_MOVE) {
             return false
@@ -151,7 +148,7 @@ class ViewHolderSwipeHelper(private val mItemState: IItemState, private val mVie
         val y = motionEvent.getY(pointerIndex)
 
         // Calculate the distance moved
-        val dx = x - mInitialTouchX
+        val dx = x - mInitialTouchX - mMovementView.translationX
         val dy = y - mInitialTouchY
         // swipe target is chose w/o applying flags so it does not really check if swiping in that
         // direction is allowed. This why here, we use mDx mDy to check slope value again.
@@ -200,6 +197,7 @@ class ViewHolderSwipeHelper(private val mItemState: IItemState, private val mVie
                             return
                         }
                         mOnMove.updateSwipedState(targetTranslateX)
+                        endRecoverAnimation(true)
                     }
                 }
                 rv.setDuration(DEFAULT_SWIPE_ANIMATION_DURATION)

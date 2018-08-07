@@ -37,10 +37,10 @@ class ChildItemViewHolder(val view: View, private val mListCallback: IListCallba
 
                 if (selectedFlags and dirFlag != 0 && Math.abs(dx) > thresholdToFull) {
                     targetTranslateX = Math.signum(dx) * view.width
-                    Log.d("Child item view holder" ,  " Full remove (threshold $thresholdToFull)")
+                    Log.d("Child item view holder", " Full remove (threshold $thresholdToFull)")
                 } else if (selectedFlags and dirFlag != 0 && Math.abs(dx) > thresholdToHalf) {
                     targetTranslateX = Math.signum(dx) * view.width * 0.5f
-                    Log.d("Child item view holder" ,  " Half swipe (threshold $thresholdToHalf)")
+                    Log.d("Child item view holder", " Half swipe (threshold $thresholdToHalf)")
                 }
 
                 return targetTranslateX
@@ -52,20 +52,23 @@ class ChildItemViewHolder(val view: View, private val mListCallback: IListCallba
         })
     }
 
-    fun stopCallbacks(){
+    fun stopCallbacks() {
         viewHolderSwipeHelper?.stopCallbacks()
         viewHolderSwipeHelper = null
     }
 
-    fun refreshView(){
-        if (isHalfState) {
-            view.viewForeground.translationX = -view.viewForeground.width * 0.5f
-            view.invalidate()
-        } else {
-            view.viewForeground.translationX = 0f
+    fun refreshView() {
+        view.post {
+            if (isHalfState) {
+                view.viewForeground.translationX = -view.viewForeground.width * 0.5f
+                view.invalidate()
+            } else {
+                view.viewForeground.translationX = 0f
+            }
+            thresholdToHalf = view.viewForeground.width.toFloat() * 0.2f
+            thresholdToFull = view.viewForeground.width.toFloat() * 0.7f
+            Log.d("Child item view holder", "Thresholds: $thresholdToFull $thresholdToHalf")
         }
-        thresholdToHalf = view.viewForeground.width.toFloat() * 0.2f
-        thresholdToFull = view.viewForeground.width.toFloat() * 0.7f
     }
 }
 

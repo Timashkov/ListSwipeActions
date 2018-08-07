@@ -26,10 +26,11 @@ class MainActivity : AppCompatActivity(), IListCallback {
     }
 
     override fun onItemClicked(item: ListItem) {
-        if (item.isCategory()){
+        if (item.isCategory()) {
             val collapsed = item.isStateCollapsed()
-            mDataSet.find { it.getId() == item.getId() }?.setStateCollapsed(!collapsed)
-            val filtered = mDataSet.filterNot { it.getParentId() == item.getId() && !it.isCategory() }
+
+            mDataSet.forEach { if (it.getParentId() == item.getId()) it.setStateCollapsed(!collapsed) }
+            val filtered = mDataSet.filter {  it.isStateCollapsed() && it.isCategory() || !it.isStateCollapsed() }
             mAdapter?.setData(filtered)
         }
     }
@@ -39,20 +40,20 @@ class MainActivity : AppCompatActivity(), IListCallback {
             val newItems = mDataSet.filter { it.getParentId() != item.getId() }
             mDataSet.clear()
             mDataSet.addAll(newItems)
-            mAdapter?.setData(mDataSet)
-        }else{
+        } else {
             mDataSet.remove(item)
-            mAdapter?.setData(mDataSet)
         }
+        val filtered = mDataSet.filter { it.isStateCollapsed() && it.isCategory() || !it.isStateCollapsed() }
+        mAdapter?.setData(filtered)
     }
 
     private fun prepareDataSet(): ArrayList<ListItem> {
 
         val list = ArrayList<ListItem>()
 
-        for (i in 0..100) {
+        for (i in 0..20) {
             list.add(CategoryListItem(i))
-            for (j in 0..100) {
+            for (j in 0..20) {
                 list.add(ChildListItem(j, i))
             }
         }

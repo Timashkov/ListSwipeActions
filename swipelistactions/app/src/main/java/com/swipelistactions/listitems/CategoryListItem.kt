@@ -28,4 +28,6 @@ class CategoryListItem(private val mId: Int) : ListItem {
     override fun getParentId(): Int = mId
 
     override fun isCategory(): Boolean = true
+
+    override fun getItemUniqId(): Long = mId.toLong()
 }

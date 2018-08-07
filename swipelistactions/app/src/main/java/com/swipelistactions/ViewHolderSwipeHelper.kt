@@ -237,7 +237,7 @@ class ViewHolderSwipeHelper(private val mItemState: IItemState, private val mVie
         }
 
         mMovementView.translationX = mDx
-        Log.d(TAG, "New DX $mDx")
+//        Log.d(TAG, "New DX $mDx")
     }
 
 
@@ -257,6 +257,10 @@ class ViewHolderSwipeHelper(private val mItemState: IItemState, private val mVie
                 return
             }
         }
+    }
+
+    fun stopCallbacks() {
+       mViewHolder.itemView.setOnTouchListener(null)
     }
 
     companion object {

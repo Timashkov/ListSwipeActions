@@ -26,4 +26,9 @@ class ChildListItem(private val mId: Int, private val mParentId: Int) : ListItem
     override fun getParentId(): Int = mParentId
 
     override fun isCategory(): Boolean = false
+
+    override fun getItemUniqId(): Long {
+        val hash = mParentId*10000 + mId
+        return hash.toLong()
+    }
 }

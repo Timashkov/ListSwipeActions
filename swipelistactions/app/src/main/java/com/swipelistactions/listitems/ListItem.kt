@@ -13,4 +13,5 @@ interface ListItem : IItemState{
     fun isStateCollapsed(): Boolean
 
     fun setStateHalfSwiped(isSwiped: Boolean)
+    fun getItemUniqId(): Long
 }

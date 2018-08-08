@@ -5,5 +5,5 @@ package com.swipelistactions.animations
  */
 interface IItemState {
     fun getStateHalfSwiped(): Boolean
-
+    fun setStateHalfSwiped(isSwiped: Boolean)
 }
